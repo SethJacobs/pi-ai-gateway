@@ -1,0 +1,26 @@
+[Unit]
+Description=AI Gateway Model Bridge
+After=network.target
+
+[Service]
+Type=exec
+User=pi
+Group=pi
+WorkingDirectory=/home/pi/pi-ai-gateway
+Environment=PATH=/home/linuxbrew/.linuxbrew/bin:/usr/local/bin:/usr/bin:/bin
+Environment=BRIDGE_HOST=0.0.0.0
+Environment=BRIDGE_PORT=9099
+ExecStart=/home/pi/pi-ai-gateway/.venv/bin/uvicorn model_bridge.main:app --host 0.0.0.0 --port 9099
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/pi/.cache/llmfit
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

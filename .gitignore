@@ -1,0 +1,17 @@
+.env
+.env.*
+!.env.tpl
+*.pem
+*.key
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+.venv/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
