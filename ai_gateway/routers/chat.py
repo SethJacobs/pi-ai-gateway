@@ -53,12 +53,14 @@ async def chat_completions(
 
     # Fallback attempt
     if decision.fallback_route is not None:
+        logger.info("Attempting fallback route: %s", decision.fallback_route.value)
         try:
             if decision.fallback_route.value == "cloud":
                 fallback_model = await request.app.state.model_registry.best_cloud_model()
                 resp = await cloud.chat(body, fallback_model)
             else:
-                resp = await local.chat(body, decision.model)
+                fallback_local_model = await request.app.state.model_registry.best_local_model()
+                resp = await local.chat(body, fallback_local_model)
             resp.x_intent = decision.intent.value
             return resp
         except Exception as fallback_err:
