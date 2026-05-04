@@ -76,8 +76,11 @@ class LlamaManager:
             try:
                 self._process.send_signal(signal.SIGTERM)
                 await asyncio.wait_for(self._process.wait(), timeout=5)
-            except (ProcessLookupError, asyncio.TimeoutError):
-                self._process.kill()
+            except (ProcessLookupError, asyncio.TimeoutError, OSError):
+                try:
+                    self._process.kill()
+                except (ProcessLookupError, OSError):
+                    pass
             self._process = None
             name = self._model_name
             self._model_name = None
