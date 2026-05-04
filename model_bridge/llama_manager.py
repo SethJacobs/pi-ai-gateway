@@ -39,7 +39,7 @@ class LlamaManager:
         """Stop any running server, then start with the given model."""
         await self.stop()
 
-        full_path = os.path.join(self.model_dir, model_path)
+        full_path = model_path if os.path.isabs(model_path) else os.path.join(self.model_dir, model_path)
         if not os.path.exists(full_path):
             return {"status": "error", "error": f"Model not found: {full_path}"}
 

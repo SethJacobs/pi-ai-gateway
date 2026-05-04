@@ -77,13 +77,32 @@ async def chat_completions(
         bridge_url = request.app.state.settings.model_bridge_url
         best_model = await registry.best_local_model()
         if best_model and best_model != "unknown":
-            async with httpx.AsyncClient(timeout=60.0) as client:
+            async with httpx.AsyncClient(timeout=300.0) as client:
+                # Download the model first (no-op if already present, fast if cached)
+                logger.info("Downloading local model: %s", best_model)
+                dl_resp = await client.post(
+                    f"{bridge_url}/llmfit/download",
+                    params={"model": best_model},
+                )
+                dl_data = dl_resp.json()
+                logger.info("Download result: %s", dl_data)
+
+                if dl_data.get("status") != "ok":
+                    raise HTTPException(
+                        status_code=502,
+                        detail=f"Model download failed: {dl_data.get('error')}",
+                    )
+
+                # Use the absolute path returned by llmfit download
+                model_path = dl_data.get("path", best_model)
+
                 load_resp = await client.post(
                     f"{bridge_url}/local/load",
-                    params={"model_path": best_model},
+                    params={"model_path": model_path},
                 )
                 load_data = load_resp.json()
                 logger.info("Auto-load result: %s", load_data)
+
             if load_data.get("status") == "loaded":
                 resp = await local.chat(body, best_model)
                 resp.x_intent = decision.intent.value

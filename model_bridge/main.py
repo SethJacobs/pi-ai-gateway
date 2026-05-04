@@ -9,7 +9,7 @@ from fastapi import FastAPI
 from .config import BridgeSettings
 from .freeride_wrapper import freeride_auto, freeride_fallbacks, freeride_list, freeride_status
 from .llama_manager import LlamaManager
-from .llmfit_wrapper import llmfit_recommend, llmfit_system
+from .llmfit_wrapper import llmfit_download, llmfit_recommend, llmfit_system
 
 logging.basicConfig(
     level=logging.INFO,
@@ -70,6 +70,12 @@ async def get_llmfit_recommend(limit: int = 5) -> dict:
 @app.get("/llmfit/system")
 async def get_llmfit_system() -> dict:
     return await llmfit_system(settings.llmfit_bin)
+
+
+@app.post("/llmfit/download")
+async def post_llmfit_download(model: str) -> dict:
+    """Download a GGUF model via llmfit. Returns the local file path on success."""
+    return await llmfit_download(settings.llmfit_bin, model)
 
 
 # --- Local model management ---
