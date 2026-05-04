@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
+import httpx
 from fastapi import APIRouter, HTTPException, Request
 
 from ..schemas import ChatCompletionRequest, ChatCompletionResponse
@@ -68,6 +69,34 @@ async def chat_completions(
                 status_code=502,
                 detail=f"Both routes failed. primary: {primary_err}, fallback: {fallback_err}",
             ) from fallback_err
+
+    # No fallback configured — try to auto-load a local model and retry
+    logger.info("No fallback route set; attempting local auto-load")
+    try:
+        registry = request.app.state.model_registry
+        bridge_url = request.app.state.settings.model_bridge_url
+        best_model = await registry.best_local_model()
+        if best_model and best_model != "unknown":
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                load_resp = await client.post(
+                    f"{bridge_url}/local/load",
+                    params={"model_path": best_model},
+                )
+                load_data = load_resp.json()
+                logger.info("Auto-load result: %s", load_data)
+            if load_data.get("status") == "loaded":
+                resp = await local.chat(body, best_model)
+                resp.x_intent = decision.intent.value
+                return resp
+            else:
+                raise HTTPException(
+                    status_code=502,
+                    detail=f"Cloud failed and local auto-load failed: {load_data}",
+                )
+    except HTTPException:
+        raise
+    except Exception as load_err:
+        logger.warning("Local auto-load attempt failed: %s", load_err)
 
     raise HTTPException(
         status_code=502,
