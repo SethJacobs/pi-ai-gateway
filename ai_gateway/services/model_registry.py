@@ -65,8 +65,20 @@ class ModelRegistry:
         return self.default_cloud_model
 
     async def best_local_model(self) -> str:
-        """Return the top-ranked local model name from LLMFit."""
+        """Return the GGUF repo of the top-ranked local model that has GGUF sources."""
         models = await self.local_models()
+        for m in models:
+            if not isinstance(m, dict):
+                continue
+            sources = m.get("gguf_sources", [])
+            if sources:
+                # Prefer bartowski, fall back to first available provider
+                repo = next(
+                    (s["repo"] for s in sources if s.get("provider") == "bartowski"),
+                    sources[0]["repo"],
+                )
+                return repo
+        # Fall back to model name if no GGUF sources found
         if models and isinstance(models[0], dict):
             return models[0].get("name", "unknown")
         return "unknown"
