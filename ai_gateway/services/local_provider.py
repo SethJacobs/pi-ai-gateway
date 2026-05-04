@@ -24,7 +24,7 @@ class LocalProvider:
         self.bridge_url = bridge_url
         # llama-server runs on the host, port configured in model-bridge
         # We derive the llama port from bridge_url (replace 9099 with 8081)
-        self._llama_base = bridge_url.replace(":9099", ":8081")
+        self._llama_base = bridge_url.replace(":9099", ":8188")
 
     async def chat(
         self, request: ChatCompletionRequest, model: str
