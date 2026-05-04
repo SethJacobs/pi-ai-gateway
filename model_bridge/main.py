@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import glob
 import logging
+import os
 from contextlib import asynccontextmanager
 from typing import AsyncIterator
 
@@ -15,6 +17,7 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(name)s %(levelname)s %(message)s",
 )
+logger = logging.getLogger(__name__)
 
 settings = BridgeSettings()
 
@@ -75,12 +78,9 @@ async def get_llmfit_system() -> dict:
 @app.post("/llmfit/download")
 async def post_llmfit_download(model: str) -> dict:
     """Download a GGUF model via llmfit. Returns the local file path on success.
-    
+
     If the model is already downloaded, returns the existing path immediately.
     """
-    # Check if already downloaded by looking in the cache dir
-    import glob
-    import os
     model_basename = model.split("/")[-1].replace("-GGUF", "")
     pattern = os.path.join(settings.model_dir, f"{model_basename}*.gguf")
     existing = glob.glob(pattern)
