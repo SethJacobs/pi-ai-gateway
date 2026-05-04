@@ -74,7 +74,20 @@ async def get_llmfit_system() -> dict:
 
 @app.post("/llmfit/download")
 async def post_llmfit_download(model: str) -> dict:
-    """Download a GGUF model via llmfit. Returns the local file path on success."""
+    """Download a GGUF model via llmfit. Returns the local file path on success.
+    
+    If the model is already downloaded, returns the existing path immediately.
+    """
+    # Check if already downloaded by looking in the cache dir
+    import glob
+    import os
+    model_basename = model.split("/")[-1].replace("-GGUF", "")
+    pattern = os.path.join(settings.model_dir, f"{model_basename}*.gguf")
+    existing = glob.glob(pattern)
+    if existing:
+        path = existing[0]
+        logger.info("Model already downloaded: %s", path)
+        return {"status": "ok", "path": path}
     return await llmfit_download(settings.llmfit_bin, model)
 
 

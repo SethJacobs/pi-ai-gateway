@@ -68,9 +68,17 @@ async def llmfit_download(bin_path: str, model: str) -> dict:
         logger.warning("llmfit download failed: %s", err or out)
         return {"status": "error", "error": err or out}
 
-    # llmfit prints the downloaded file path on the last non-empty line
-    lines = [l for l in out.splitlines() if l.strip()]
-    file_path = lines[-1].strip() if lines else None
+    # Extract path from "Saved to: /path/to/file.gguf" line
+    file_path = None
+    for line in out.splitlines():
+        line = line.strip()
+        if line.startswith("Saved to:"):
+            file_path = line.split("Saved to:", 1)[1].strip()
+            break
+
+    if not file_path:
+        logger.warning("Could not parse file path from llmfit output: %s", out)
+        return {"status": "error", "error": "Could not determine downloaded file path"}
 
     logger.info("llmfit download complete: %s", file_path)
     return {"status": "ok", "path": file_path, "output": out}
