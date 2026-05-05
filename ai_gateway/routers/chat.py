@@ -38,6 +38,7 @@ async def chat_completions(
 
     cloud = request.app.state.cloud_provider
     local = request.app.state.local_provider
+    registry = request.app.state.model_registry
 
     # Primary attempt
     primary_err: Exception | None = None
@@ -52,15 +53,29 @@ async def chat_completions(
         primary_err = exc
         logger.warning("Primary route (%s) failed: %s", decision.route.value, exc)
 
-    # Fallback attempt
+    # If cloud failed, cycle through all freeride fallback models before giving up
+    if decision.route.value == "cloud":
+        fallback_models = await registry.cloud_fallback_models()
+        for model_id in fallback_models:
+            if model_id == decision.model:
+                continue  # already tried this one
+            try:
+                logger.info("Trying cloud fallback model: %s", model_id)
+                resp = await cloud.chat(body, model_id)
+                resp.x_intent = decision.intent.value
+                return resp
+            except Exception as exc:
+                logger.warning("Cloud fallback model %s failed: %s", model_id, exc)
+
+    # Explicit fallback route (e.g. local was preferred, cloud failed)
     if decision.fallback_route is not None:
         logger.info("Attempting fallback route: %s", decision.fallback_route.value)
         try:
             if decision.fallback_route.value == "cloud":
-                fallback_model = await request.app.state.model_registry.best_cloud_model()
+                fallback_model = await registry.best_cloud_model()
                 resp = await cloud.chat(body, fallback_model)
             else:
-                fallback_local_model = await request.app.state.model_registry.best_local_model()
+                fallback_local_model = await registry.best_local_model()
                 resp = await local.chat(body, fallback_local_model)
             resp.x_intent = decision.intent.value
             return resp

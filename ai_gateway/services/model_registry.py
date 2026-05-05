@@ -8,6 +8,7 @@ import httpx
 logger = logging.getLogger(__name__)
 
 _CACHE_TTL = 300  # 5 minutes
+_CLOUD_CACHE_TTL = 300  # re-read freeride config every 5 min
 
 
 class ModelRegistry:
@@ -25,20 +26,31 @@ class ModelRegistry:
     async def cloud_models(self) -> list[dict]:
         """Get available cloud models from FreeRide via model-bridge."""
         now = time.time()
-        if now - self._cloud_cache_time < _CACHE_TTL and self._cloud_cache:
+        if now - self._cloud_cache_time < _CLOUD_CACHE_TTL and self._cloud_cache:
             return self._cloud_cache
 
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
-                resp = await client.get(f"{self.bridge_url}/freeride/list")
+                resp = await client.get(f"{self.bridge_url}/freeride/models")
                 data = resp.json()
-                # freeride list returns raw text; cache it as-is
-                self._cloud_cache = [data] if isinstance(data, dict) else data
-                self._cloud_cache_time = now
-                return self._cloud_cache
-        except (httpx.HTTPError, Exception) as e:
+                models = [{"id": m} for m in data.get("models", [])]
+                if models:
+                    self._cloud_cache = models
+                    self._cloud_cache_time = now
+                return self._cloud_cache or [{"id": self.default_cloud_model}]        except (httpx.HTTPError, Exception) as e:
             logger.debug("Failed to fetch cloud models: %s", e)
-            return self._cloud_cache
+            return self._cloud_cache or [{"id": self.default_cloud_model}]
+
+    async def cloud_fallback_models(self) -> list[str]:
+        """Return ordered list of cloud model IDs to try, starting with default."""
+        models = await self.cloud_models()
+        ids = [m["id"] for m in models if m.get("id")]
+        if not ids:
+            return [self.default_cloud_model]
+        # Ensure default is first
+        if self.default_cloud_model not in ids:
+            ids.insert(0, self.default_cloud_model)
+        return ids
 
     async def local_models(self) -> list[dict]:
         """Get recommended local models from LLMFit via model-bridge."""

@@ -14,5 +14,6 @@ class BridgeSettings(BaseSettings):
     model_dir: str = "/home/pi/.cache/llmfit/models"
     max_context_size: int = 2048
     llama_threads: int = 4
+    freeride_refresh_interval_hours: int = 24
 
     model_config = {"env_prefix": "BRIDGE_"}
