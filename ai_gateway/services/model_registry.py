@@ -37,7 +37,8 @@ class ModelRegistry:
                 if models:
                     self._cloud_cache = models
                     self._cloud_cache_time = now
-                return self._cloud_cache or [{"id": self.default_cloud_model}]        except (httpx.HTTPError, Exception) as e:
+                return self._cloud_cache or [{"id": self.default_cloud_model}]
+        except (httpx.HTTPError, Exception) as e:
             logger.debug("Failed to fetch cloud models: %s", e)
             return self._cloud_cache or [{"id": self.default_cloud_model}]
 
