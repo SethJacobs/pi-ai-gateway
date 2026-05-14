@@ -4,7 +4,12 @@ import pytest
 import respx
 from httpx import Response
 
-from ai_gateway.schemas import ChatCompletionRequest, ChatMessage
+from ai_gateway.schemas import (
+    ChatCompletionRequest,
+    ChatMessage,
+    FunctionDefinition,
+    ToolDefinition,
+)
 from ai_gateway.services.cloud_provider import CloudProvider
 
 
@@ -80,5 +85,80 @@ class TestCloudProvider:
         await provider.chat(req, "model")
 
         assert route.calls[0].request.headers["Authorization"] == "Bearer test-key"
+
+        await provider.close()
+
+    @respx.mock
+    @pytest.mark.asyncio
+    async def test_tool_calling_request(self, provider: CloudProvider) -> None:
+        """Test that tools are passed through to the API."""
+        route = respx.post("https://openrouter.ai/api/v1/chat/completions").mock(
+            return_value=Response(
+                200,
+                json={
+                    "id": "chatcmpl-tool123",
+                    "object": "chat.completion",
+                    "created": 1700000000,
+                    "model": "anthropic/claude-3.5-sonnet",
+                    "choices": [
+                        {
+                            "index": 0,
+                            "message": {
+                                "role": "assistant",
+                                "content": None,
+                                "tool_calls": [
+                                    {
+                                        "id": "call_abc123",
+                                        "type": "function",
+                                        "function": {
+                                            "name": "get_weather",
+                                            "arguments": '{"location": "Boston"}',
+                                        },
+                                    }
+                                ],
+                            },
+                            "finish_reason": "tool_calls",
+                        }
+                    ],
+                    "usage": {"prompt_tokens": 50, "completion_tokens": 20, "total_tokens": 70},
+                },
+            )
+        )
+
+        req = ChatCompletionRequest(
+            messages=[ChatMessage(role="user", content="What's the weather in Boston?")],
+            tools=[
+                ToolDefinition(
+                    type="function",
+                    function=FunctionDefinition(
+                        name="get_weather",
+                        description="Get current weather",
+                        parameters={
+                            "type": "object",
+                            "properties": {
+                                "location": {"type": "string", "description": "City name"}
+                            },
+                            "required": ["location"],
+                        },
+                    ),
+                )
+            ],
+        )
+        resp = await provider.chat(req, "anthropic/claude-3.5-sonnet")
+
+        # Verify request included tools
+        request_body = route.calls[0].request.content
+        import json
+        sent = json.loads(request_body)
+        assert "tools" in sent
+        assert len(sent["tools"]) == 1
+        assert sent["tools"][0]["function"]["name"] == "get_weather"
+
+        # Verify response includes tool_calls
+        assert resp.choices[0].message.tool_calls is not None
+        assert len(resp.choices[0].message.tool_calls) == 1
+        assert resp.choices[0].message.tool_calls[0].function.name == "get_weather"
+        assert resp.choices[0].message.tool_calls[0].function.arguments == '{"location": "Boston"}'
+        assert resp.choices[0].finish_reason == "tool_calls"
 
         await provider.close()
