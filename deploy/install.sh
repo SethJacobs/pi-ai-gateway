@@ -7,20 +7,19 @@ NGINX_CONF_DIR="${HOME}/home-server/nginx/conf.d"
 
 echo "=== Pi AI Gateway Installer ==="
 
-# 1. Resolve secrets from 1Password
-echo "[1/5] Resolving secrets..."
+# 1. Check secrets
+echo "[1/5] Checking secrets..."
 cd "${PROJECT_DIR}"
-if command -v op &> /dev/null; then
+if [ -f .env ]; then
+    echo "  .env found"
+elif command -v op &> /dev/null; then
     op inject -i .env.tpl -o .env --force
     echo "  Secrets injected from 1Password"
 else
-    echo "  WARNING: 1Password CLI not found. Create .env manually:"
+    echo "  ERROR: No .env file found. Create one with:"
     echo "    OPENROUTER_API_KEY=your-key"
-    echo "    GATEWAY_API_KEY=your-optional-key"
-    if [ ! -f .env ]; then
-        echo "  No .env file found — aborting."
-        exit 1
-    fi
+    echo "    GATEWAY_API_KEY="
+    exit 1
 fi
 
 # 2. Create Python venv for model-bridge
