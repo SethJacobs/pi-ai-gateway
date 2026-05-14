@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-PROJECT_DIR="${HOME}/pi-ai-gateway"
+PROJECT_DIR="/home/pi/home-server/pi-ai-gateway"
 SYSTEMD_DIR="/etc/systemd/system"
 NGINX_CONF_DIR="${HOME}/home-server/nginx/conf.d"
 

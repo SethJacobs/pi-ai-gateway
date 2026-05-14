@@ -55,6 +55,7 @@ class SystemMonitor:
                 data = resp.json()
                 self._local_cache = data
                 self._local_cache_time = now
+                logger.debug("Local model status response: %s", data)
                 return data.get("status") == "loaded"
         except (httpx.HTTPError, Exception):
             return False

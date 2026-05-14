@@ -146,12 +146,13 @@ class RouterEngine:
                 fallback_route=Route.CLOUD,
             )
 
-        # Default to cloud
+        # Default to cloud, always allow local fallback if a model is loaded
+        # (even if RAM is below threshold, a loaded model can still serve requests)
         model = request.model or await self.registry.best_cloud_model()
         return RoutingDecision(
             route=Route.CLOUD,
             intent=intent,
             model=model,
             reason=f"intent={intent.value} local_viable={local_viable}",
-            fallback_route=Route.LOCAL if local_viable else None,
+            fallback_route=Route.LOCAL if local_loaded else None,
         )

@@ -39,7 +39,7 @@ class LlamaManager:
         """Stop any running server, then start with the given model."""
         await self.stop()
 
-        full_path = os.path.join(self.model_dir, model_path)
+        full_path = model_path if os.path.isabs(model_path) else os.path.join(self.model_dir, model_path)
         if not os.path.exists(full_path):
             return {"status": "error", "error": f"Model not found: {full_path}"}
 
@@ -59,8 +59,8 @@ class LlamaManager:
         self._model_path = full_path
         self._model_name = os.path.basename(model_path)
 
-        # Wait for server to become ready
-        for _ in range(30):
+        # Wait for server to become ready (Pi can be slow loading large models)
+        for _ in range(60):
             await asyncio.sleep(1)
             if await self._health_check():
                 logger.info("llama-server ready: %s", self._model_name)
@@ -76,8 +76,11 @@ class LlamaManager:
             try:
                 self._process.send_signal(signal.SIGTERM)
                 await asyncio.wait_for(self._process.wait(), timeout=5)
-            except (ProcessLookupError, asyncio.TimeoutError):
-                self._process.kill()
+            except (ProcessLookupError, asyncio.TimeoutError, OSError):
+                try:
+                    self._process.kill()
+                except (ProcessLookupError, OSError):
+                    pass
             self._process = None
             name = self._model_name
             self._model_name = None
@@ -101,7 +104,15 @@ class LlamaManager:
     async def _health_check(self) -> bool:
         try:
             async with httpx.AsyncClient(timeout=2.0) as client:
+                # llama-server health endpoint varies by version;
+                # /health returns 200 when ready, 503 when loading, 404 on older builds
+                # Fall back to /v1/models which is always present
                 resp = await client.get(f"{self.base_url}/health")
+                if resp.status_code in (200, 503):
+                    # 503 means loading, 200 means ready
+                    return resp.status_code == 200
+                # Older builds: try /v1/models
+                resp = await client.get(f"{self.base_url}/v1/models")
                 return resp.status_code == 200
         except (httpx.HTTPError, ConnectionError):
             return False

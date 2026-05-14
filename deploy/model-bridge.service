@@ -17,10 +17,6 @@ StandardOutput=journal
 StandardError=journal
 
 NoNewPrivileges=true
-ProtectSystem=strict
-ProtectHome=read-only
-ReadWritePaths=/home/pi/.cache/llmfit
-PrivateTmp=true
 
 [Install]
 WantedBy=multi-user.target
